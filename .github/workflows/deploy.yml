@@ -1,0 +1,59 @@
+name: Full Stack Deployment Test
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  COMPOSE_PROJECT_NAME: myapp
+
+jobs:
+  deploy-and-test:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          echo "DB_USER=${{ secrets.DB_USER }}" > .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+
+      - name: Deploy with Docker Compose
+        run: |
+          docker compose up -d
+          sleep 10
+
+      - name: Verify containers are running
+        run: |
+          if docker compose ps --status=running | grep -q "Up"; then
+            echo "All containers are running"
+          else
+            echo "Failed"
+            exit 1
+          fi
+
+      - name: Run application tests
+        run: |
+          echo "Testing DB connection..."
+          docker compose exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -c "SELECT 1;"
+          echo "Testing Web..."
+          curl -f http://localhost:3000 || exit 1
+
+      - name: Create test report
+        if: always()
+        run: |
+          echo "# Deployment Report" > test-report.md
+          echo "- Date: $(date)" >> test-report.md
+          docker compose logs > deployment-logs.txt
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts
+          path: |
+            .env
+            test-report.md
+            deployment-logs.txt
