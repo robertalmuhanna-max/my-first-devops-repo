@@ -22,6 +22,8 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
+          # هذا الأمر يقوم بمسح أي بيانات قديمة لضمان عمل قاعدة البيانات بشكل صحيح
+          docker compose down -v || true 
           docker compose up -d
           sleep 10
 
